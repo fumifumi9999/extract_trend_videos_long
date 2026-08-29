@@ -1,0 +1,13 @@
+[project]
+name = "extract-trend-videos"
+version = "0.1.0"
+description = "YouTubeチャンネルのShortsからoutlier動画を抽出してCSV出力する"
+requires-python = ">=3.9"
+dependencies = [
+    "python-dotenv>=1.0",
+    "gspread>=6.0",
+]
+
+[tool.uv]
+# ライブラリではなく単体スクリプト集なので、プロジェクト自身はビルド/インストールしない
+package = false

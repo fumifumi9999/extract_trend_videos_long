@@ -1,0 +1,17 @@
+# APIキーを含む実ファイル (.env.example のみコミットする)
+.env
+
+# サービスアカウントの秘密鍵
+spreadsheet_key/*
+*-credentials.json
+
+# 出力CSV / メール本文のプレビュー
+shorts_outliers_*.csv
+report_preview.html
+
+__pycache__/
+*.pyc
+
+# 仮想環境 (uv は通常キャッシュ内の環境を使うため作られない)
+.venv/
+# shorts_outlier.py.lock は再現性のためコミットする
