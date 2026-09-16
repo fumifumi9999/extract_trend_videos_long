@@ -30,10 +30,17 @@ main.py
     uv run main.py --dry-run     → report_preview.html が出力される
                                    (通知済みの記録も付かないので何度でも試せる)
 
+    # 先頭3チャンネルだけで素早く動作確認したい場合
+    uv run main.py --dry-run --max-channels 3
+
+    # 出力をコンソールに出しつつログファイルにも追記したい場合
+    uv run main.py --log logs\today.log
+
     # 毎日自動で実行する場合は run_daily.cmd をタスクスケジューラに登録する
     # (README.md の「タスクスケジューラへの登録」を参照)
 """
 
+import argparse
 import html as html_lib
 import sys
 import urllib.parse
@@ -46,6 +53,41 @@ from long_video_outlier import JST, ShortsOutlierError, ShortsOutlierExtractor, 
 from video_store import VideoStore
 
 PREVIEW_FILE = "report_preview.html"
+
+
+class Tee:
+    """書き込みを複数のストリームに複製する。
+
+    タスクスケジューラで動かすとき、進捗を cmd.exe の画面に出しながら
+    ログファイルにも残すために sys.stdout / sys.stderr を差し替える。
+    cmd 側のパイプで tee するとPythonの終了コードが失われるので、Python側でやる。
+    """
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for stream in self.streams:
+            stream.write(text)
+        return len(text)
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+    def __getattr__(self, name):
+        # encoding / isatty など、それ以外の問い合わせは元のコンソールに委ねる
+        return getattr(self.streams[0], name)
+
+
+def tee_to_file(path):
+    """stdout / stderr をコンソールとファイルの両方に流す。ファイルは行ごとにflushする"""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    log = open(path, "a", encoding="utf-8", buffering=1)
+    sys.stdout = Tee(sys.stdout, log)
+    sys.stderr = Tee(sys.stderr, log)
+    return log
 
 
 class TrendReporter:
@@ -334,8 +376,23 @@ class TrendReporter:
         return subject
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="スプレッドシートのチャンネルを解析し、よい動画をメールで送る")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="送信せず report_preview.html に本文を出す(通知済みの記録も付かない)")
+    parser.add_argument("--max-channels", type=int, metavar="N",
+                        help="先頭N件のチャンネルだけ処理する(動作確認用)")
+    parser.add_argument("--log", metavar="PATH",
+                        help="出力をこのファイルにも追記する(コンソールにも出る)")
+    return parser.parse_args()
+
+
 def main():
     """使い方の例。ここを書き換えて `uv run main.py` で実行する。"""
+    args = parse_args()
+    if args.log:
+        tee_to_file(args.log)
 
     # === 設定(ここの値を書き換えて使う) ===============================
     # ※ shorts_outlier.py / sheet_reader.py 側の main() は uv run main.py では
@@ -351,7 +408,7 @@ def main():
         # --- 読み取り元 (sheet_reader) ---
         sheet_name=None,    # None なら「①YouTubeベンチマーク_雑学」
         start_cell=None,    # None なら "H6"
-        max_channels=None,  # 動作確認用の上限。例: 3 なら先頭3チャンネルだけ処理
+        max_channels=args.max_channels,  # 動作確認用の上限(--max-channels N)
 
         # --- 通知の重複除外 (video_store) ---
         use_db=True,        # 通知した動画をSQLiteに記録し、二度目は通知しない
@@ -362,14 +419,13 @@ def main():
         subject=None,       # 件名。None なら日付と件数から自動生成
         attach_csv=True,    # 結果CSVを添付するか
 
-        # コマンドラインで --dry-run を付けても同じ(タスクの動作確認用)
-        dry_run="--dry-run" in sys.argv,
+        dry_run=args.dry_run,   # --dry-run で送信せずプレビューだけ出す
         verbose=True,       # False にすると進捗表示を止める
     )
     reporter.run()
 
     # === 送信せず、まず本文を確認したい場合 =============================
-    # uv run main.py --dry-run
+    # uv run main.py --dry-run --max-channels 3
     # → report_preview.html をブラウザで開く
 
     # === 全件を載せたい場合(通知済み・基準未満の動画も表に出す) =========

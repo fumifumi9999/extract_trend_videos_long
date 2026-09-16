@@ -2,8 +2,12 @@
 rem ===========================================================================
 rem run_daily.cmd - wrapper for Windows Task Scheduler (see README.md).
 rem
-rem   run_daily.cmd --dry-run   preview only, sends no mail, records nothing
-rem   run_daily.cmd             the real thing
+rem   run_daily.cmd --dry-run                   preview only, sends no mail
+rem   run_daily.cmd --dry-run --max-channels 3  quick check with 3 channels
+rem   run_daily.cmd                             the real thing
+rem
+rem Progress is shown in this window AND appended to logs\YYYY-MM-DD.log
+rem (main.py --log writes to both; a cmd pipe would lose the exit code).
 rem
 rem Task Scheduler inherits neither PATH nor the working directory nor a usable
 rem console code page, so everything is pinned down here.
@@ -12,6 +16,7 @@ rem NOTE: keep this file ASCII-only with CRLF line endings. cmd.exe parses batch
 rem files with the console code page, so non-ASCII comments can break parsing.
 rem ===========================================================================
 setlocal
+title LongTrendReport
 
 rem Force UTF-8 output. The log is redirected to a file, and with the default
 rem cp932 a video title containing an emoji raises UnicodeEncodeError and kills
@@ -38,11 +43,13 @@ set "LOG=logs\%TODAY%.log"
 
 echo ============================================================ >> "%LOG%"
 echo [%DATE% %TIME%] start %* >> "%LOG%"
+echo [%DATE% %TIME%] start %*   (log: %LOG%)
 
-"%UV%" run main.py %* >> "%LOG%" 2>&1
+"%UV%" run main.py --log "%LOG%" %*
 set "CODE=%ERRORLEVEL%"
 
 echo [%DATE% %TIME%] exit=%CODE% >> "%LOG%"
+echo [%DATE% %TIME%] exit=%CODE%
 
 rem Drop logs older than 30 days.
 powershell -NoProfile -Command "Get-ChildItem 'logs\*.log' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force" >nul 2>&1

@@ -44,6 +44,7 @@ import json
 import os
 import re
 import socket
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -408,8 +409,10 @@ class ShortsOutlierExtractor:
         """
         channel_urls = list(channel_urls)
         rows, skipped = [], []
+        started = time.monotonic()
         for i, url in enumerate(channel_urls, 1):
-            self._log(f"\n[{i}/{len(channel_urls)}] {url}")
+            self._log(f"\n[{i}/{len(channel_urls)}] {url}"
+                      + self._progress(started, i - 1, len(channel_urls)))
             try:
                 for row in analyze_one(url):
                     rows.append({"チャンネル": url, **row})
@@ -426,6 +429,16 @@ class ShortsOutlierExtractor:
             for url, reason in skipped:
                 self._log(f"  - {url}  ({reason})")
         return rows
+
+    @staticmethod
+    def _progress(started, done, total):
+        """「(経過 1:05 / 残り約 9:40)」のような進捗の目安。1件目はまだ推定できない"""
+        if done == 0:
+            return ""
+        elapsed = time.monotonic() - started
+        remaining = elapsed / done * (total - done)
+        fmt = lambda sec: f"{int(sec) // 60}:{int(sec) % 60:02d}"
+        return f"  (経過 {fmt(elapsed)} / 残り約 {fmt(remaining)})"
 
     def to_csv(self, rows, output=None, fields=None):
         """analyze() / analyze_many() の結果をCSVに書き出し、出力先パスを返す。
