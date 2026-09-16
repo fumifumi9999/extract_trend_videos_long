@@ -7,7 +7,12 @@ spreadsheet_key/*
 
 # 出力CSV / メール本文のプレビュー
 shorts_outliers_*.csv
+long_videos_*.csv
 report_preview.html
+
+# タスクスケジューラ実行時のログ (run_daily.cmd が日付ごとに出力する)
+logs/
+
 
 __pycache__/
 *.pyc
